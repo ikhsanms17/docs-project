@@ -5,8 +5,7 @@ metadata:
   namespace: frontend
 spec:
   selector:
-    matchLabels:
-      app: frontend
+    app: frontend
   ports:
     - name: port-fe
       protocol: TCP

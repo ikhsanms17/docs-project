@@ -5,8 +5,7 @@ metadata:
   namespace: backend
 spec:
   selector:
-    matchLabels:
-      app: backend
+    app: backend
   ports:
     - name: port-api
       protocol: TCP
