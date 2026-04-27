@@ -4,14 +4,14 @@ metadata:
   name: be-ingress
   namespace: backend
   annotations:
-    nginx.ingress.kubernetes.io/rewrite-target: /api/v1/$3
+    nginx.ingress.kubernetes.io/rewrite-target: /$1
 spec:
   ingressClassName: nginx
   rules:
     - host: republikorp.local
       http:
         paths:
-          - path: /api/v1(/|$)(.*)
+          - path: /
             pathType: Prefix
             backend:
               service:
@@ -25,7 +25,7 @@ metadata:
   name: dav-ingress
   namespace: backend
   annotations:
-    nginx.ingress.kubernetes.io/rewrite-target: /$2
+    nginx.ingress.kubernetes.io/rewrite-target: /dav$2
 spec:
   ingressClassName: nginx
   rules:
