@@ -4,35 +4,21 @@ metadata:
   name: be-ingress
   namespace: backend
   annotations:
-    nginx.ingress.kubernetes.io/rewrite-target: /$1
+    kubernetes.io/ingress.class: nginx
 spec:
   ingressClassName: nginx
   rules:
     - host: republikorp.local
       http:
         paths:
-          - path: /
+          - path: /api/v1
             pathType: Prefix
             backend:
               service:
                 name: be-svc
                 port:
                   number: 3333
----
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: dav-ingress
-  namespace: backend
-  annotations:
-    nginx.ingress.kubernetes.io/rewrite-target: /dav$2
-spec:
-  ingressClassName: nginx
-  rules:
-    - host: republikorp.local
-      http:
-        paths:
-          - path: /dav(/|$)(.*)
+          - path: /dav
             pathType: Prefix
             backend:
               service:
