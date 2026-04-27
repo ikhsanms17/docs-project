@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  frontend:
+    container_name: republikorp-fe
+    build:
+      context: .
+      args:
+        - SESSION_SECRET=${SESSION_SECRET}
+        - ALTCHA_HMAC_KEY=${ALTCHA_HMAC_KEY}
+        - CONFIG_BACKEND_URL_DOMAIN=${CONFIG_BACKEND_URL_DOMAIN}
+        - BACKEND_URL=${BACKEND_URL}
+        - NEXT_PUBLIC_BACKEND_URL=${NEXT_PUBLIC_BACKEND_URL}
+        - NEXT_PUBLIC_ONLYOFFICE_URL=${NEXT_PUBLIC_ONLYOFFICE_URL}
+    image: ${REGISTRY_USER}/${PROJECT_NAME}:${CURRENT_NODE_ENV}-latest
+    restart: always
+    env_file:
+      - ./.env
+    ports:
+      - "${PORT_APP}:3000"
+    networks:
+      - custom_net
+
+networks:
+  custom_net:
+    external: true

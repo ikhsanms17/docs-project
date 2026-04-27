@@ -1,0 +1,105 @@
+- name: Installation PHP 8.2
+  hosts: workers
+  become: yes
+  vars:
+    php_version: "8.2"
+    php_modules:
+      - php{{ php_version }}
+      - php{{ php_version }}-common
+      - php{{ php_version }}-gd
+      - php{{ php_version }}-mysql
+      - php{{ php_version }}-imap
+      - php{{ php_version }}-cli
+      - php{{ php_version }}-cgi
+      - php{{ php_version }}-curl
+      - php{{ php_version }}-intl
+      - php{{ php_version }}-pspell
+      - php{{ php_version }}-sqlite3
+      - php{{ php_version }}-tidy
+      - php{{ php_version }}-xmlrpc
+      - php{{ php_version }}-xsl
+      - php{{ php_version }}-imagick
+      - php{{ php_version }}-zip
+      - php{{ php_version }}-mbstring
+      - php{{ php_version }}-soap
+      - php{{ php_version }}-opcache
+      - php{{ php_version }}-apcu
+      - php{{ php_version }}-fpm
+      - php{{ php_version }}-redis
+      - php{{ php_version }}-snmp
+      - php{{ php_version }}-pgsql
+      - php{{ php_version }}-bcmath
+      - php{{ php_version }}-bz2
+      - php{{ php_version }}-calendar
+      - php{{ php_version }}-ctype
+      - php{{ php_version }}-dom
+      - php{{ php_version }}-exif
+      - php{{ php_version }}-fileinfo
+      - php{{ php_version }}-ftp
+      - php{{ php_version }}-gettext
+      - php{{ php_version }}-gmp
+      - php{{ php_version }}-iconv
+      - php{{ php_version }}-ldap
+      - php{{ php_version }}-mysqli
+      - php{{ php_version }}-mysqlnd
+      - php{{ php_version }}-odbc
+      - php{{ php_version }}-pdo
+      - php{{ php_version }}-phar
+      - php{{ php_version }}-posix
+      - php{{ php_version }}-readline
+      - php{{ php_version }}-shmop
+      - php{{ php_version }}-simplexml
+      - php{{ php_version }}-sockets
+      - php{{ php_version }}-sysvmsg
+      - php{{ php_version }}-sysvsem
+      - php{{ php_version }}-sysvshm
+      - php{{ php_version }}-tokenizer
+      - php{{ php_version }}-xml
+      - php{{ php_version }}-xmlreader
+      - php{{ php_version }}-xmlwriter
+      - libapache2-mod-php{{ php_version }}
+
+    extra_packages:
+      - libapache2-mod-fcgid
+      - apache2-suexec-pristine
+      - libruby
+      - libapache2-mod-python
+      - memcached
+      - net-tools
+      - htop
+      - nmap
+      - git
+      - lsb-release
+      - ntp
+      - unzip
+      - bzip2
+      - arj
+      - nomarch
+      - lzop
+      - cabextract
+      - apt-listchanges
+      - libnet-ldap-perl
+      - libauthen-sasl-perl
+      - daemon
+      - libio-string-perl
+      - libio-socket-ssl-perl
+      - libnet-ident-perl
+      - zip
+      - libnet-dns-perl
+      - libapache2-reload-perl
+
+  tasks:
+    #    - name: Add PHP 7.4 repository (for Ubuntu/Debian)
+    #      ansible.builtin.apt_repository:
+    #        repo: ppa:ondrej/php
+    #        state: present
+    #      when: ansible_distribution == "Ubuntu"
+
+    - name: Update apt cache
+      ansible.builtin.apt:
+        update_cache: yes
+
+    - name: Install PHP 8.2 and modules
+      ansible.builtin.apt:
+        name: "{{ php_modules + extra_packages }}"
+        state: present

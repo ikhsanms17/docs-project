@@ -1,0 +1,18 @@
+services:
+  backend:
+    container_name: republikorp-be
+    build:
+      context: .
+    image: ${REGISTRY_USER}/${PROJECT_NAME}:latest
+    restart: always
+    env_file:
+      - ./.env
+    ports:
+      - '${PORT_APP}:3333'
+      - '2100:2100'
+    networks:
+      - custom_net
+
+networks:
+  custom_net:
+    external: true

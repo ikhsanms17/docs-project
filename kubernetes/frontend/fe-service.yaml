@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: fe-svc
+  namespace: frontend
+spec:
+  selector:
+    matchLabels:
+      app: frontend
+  ports:
+    - name: port-fe
+      protocol: TCP
+      port: 3000
+      targetPort: 3000

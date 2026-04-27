@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: be-deployment
+  namespace: backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      containers:
+        - name: republikrop-be
+          image: maolanaikhsan31/republikorp-be:latest
+          ports:
+            - name: port-be
+              containerPort: 3333
+            - name: port-webdav
+              containerPort: 2100
+          envFrom:
+            - configMapRef:
+              name: be-env-configmap
+            - secretRef:
+              name: be-env-secret
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "128m"
+            limits:
+              memory: "256Mi"
+              cpu: "256m"

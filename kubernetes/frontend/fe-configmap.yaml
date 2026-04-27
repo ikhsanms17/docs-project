@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fe-env-configmap
+data:
+  BACKEND_URL: https://republikorp.local
+  NEXT_PUBLIC_BACKEND_URL: https://republikorp.local
+  CONFIG_BACKEND_URL_DOMAIN: republikorp.local
+  NEXT_PUBLIC_ONLYOFFICE_URL: https://office.santuy.info

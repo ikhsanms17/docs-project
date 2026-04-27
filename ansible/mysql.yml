@@ -1,0 +1,74 @@
+- name: Install and configure MySQL with remote access
+  hosts: workers
+  become: yes
+
+  vars:
+    mysql_root_password: "DBD1sP5i4DMySQL"
+    remote_user: "root"
+    remote_password: "DBD1sP5i4DMySQL"
+    remote_host: "%"
+    mysql_bind_address: "0.0.0.0"
+    mysql_version: "default" # bisa diganti menjadi 5.7 atau 8.0 jika ingin versi spesifik
+
+  tasks:
+    - name: Install PyMySQL for Ansible MySQL modules
+      apt:
+        name: python3-pymysql
+        state: present
+
+    - name: Install dependencies
+      apt:
+        name: "{{ item }}"
+        state: present
+      loop:
+        - gnupg
+        - debconf-utils
+
+    - name: Set MySQL root password before install
+      debconf:
+        name: mysql-server
+        question: "mysql-server/root_password"
+        value: "{{ mysql_root_password }}"
+        vtype: "password"
+
+    - name: Confirm root password again
+      debconf:
+        name: mysql-server
+        question: "mysql-server/root_password_again"
+        value: "{{ mysql_root_password }}"
+        vtype: "password"
+
+    - name: Install MySQL server
+      apt:
+        name: mysql-server
+        state: present
+        update_cache: yes
+
+    - name: Ensure MySQL is started and enabled
+      service:
+        name: mysql
+        state: started
+        enabled: yes
+
+    - name: Set bind-address to allow external connections
+      lineinfile:
+        path: /etc/mysql/mysql.conf.d/mysqld.cnf
+        regexp: "^bind-address"
+        line: "bind-address = {{ mysql_bind_address }}"
+      notify: Restart MySQL
+
+    - name: Allow remote user login
+      mysql_user:
+        name: "{{ remote_user }}"
+        host: "{{ remote_host }}"
+        password: "{{ remote_password }}"
+        priv: "*.*:ALL,GRANT"
+        state: present
+        login_user: root
+        login_password: "{{ mysql_root_password }}"
+
+  handlers:
+    - name: Restart MySQL
+      service:
+        name: mysql
+        state: restarted

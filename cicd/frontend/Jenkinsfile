@@ -1,0 +1,201 @@
+pipeline {
+    agent any
+    environment {
+        PROJECT_NAME = 'republikorp-fe'
+        GIT_CREDENTIALS = 'gitgras-key'
+        DOCKER_CREDENTIALS = 'credential-dockerhub'
+        REGISTRY_USER = 'maolanaikhsan31'
+    }
+
+    stages {
+        stage('Initialization & Environment Setup') {
+            steps {
+                script {
+                    def nameParts = env.JOB_BASE_NAME.split('-')
+
+                    if (nameParts.size() > 2) {
+                        env.CURRENT_NODE_ENV = nameParts[2]
+                    } else {
+                        env.CURRENT_NODE_ENV = 'dev'
+                    }
+
+                    // Menggunakan double quotes agar variabel terisi
+                    env.IMAGE_NAME = "${env.REGISTRY_USER}/${env.PROJECT_NAME}"
+                    env.GIT_URL = "ssh://gitgras@santuy.info:222/volume1/git/dpt/republik/${env.PROJECT_NAME}.git"
+
+                    echo "Environment terdeteksi: ${env.CURRENT_NODE_ENV}"
+
+                    if (env.CURRENT_NODE_ENV == 'prod') {
+                        env.SSH_SERVER = 'jenkins@republikorp.app'
+                        env.PORT_SERVER = '59437'
+                        env.SSH_CREDENTIALS = 'ssh-prod-server'
+                        env.PROJECT_PATH = "/var/www/html/republikorp/docker/${env.PROJECT_NAME}"          
+                        env.ENV_FILES = 'frontend-env-prod'
+                        env.PORT_APP = '5000'
+                    } else if (env.CURRENT_NODE_ENV == 'dev') {
+                        env.SSH_SERVER = 'republik@192.168.4.28'
+                        env.PORT_SERVER = '22'
+                        env.SSH_CREDENTIALS = 'ssh-private-key'
+                        env.PROJECT_PATH = "/var/www/html/republik/envvars/${env.PROJECT_NAME}"          
+                        env.ENV_FILES = "${env.PROJECT_NAME}-env"
+                        env.PORT_APP = '5050'                        
+                    } else {
+                        error "ENV TIDAK DAPAT DIDEFINISIKAN!!"
+                    }
+                }
+            }
+        }
+        
+        stage('Checkout SCM') {
+            steps {
+                echo "Checking out code..."
+                // Menggunakan env.GIT_URL yang sudah didefinisikan di atas
+                git branch: 'master',
+                    url: "${env.GIT_URL}",
+                    credentialsId: "${env.GIT_CREDENTIALS}"
+            }
+        }
+        
+        stage('Copy env and compose file') {
+            steps {
+                echo "Copying env and compose file..."
+                script {
+                    // Gunakan double quotes "${env.ENV_FILES}" agar nilainya dinamis
+                    withCredentials([
+                        file(credentialsId: "${env.ENV_FILES}", variable: 'ENV_FILE'),
+                        sshUserPrivateKey(credentialsId: "${env.SSH_CREDENTIALS}", keyFileVariable: 'SSH_KEY')
+                    ]) {
+                        echo "Copying to jenkins agent..."
+                        sh '''
+                            chmod +x .
+                            rm -f .env
+                            cp "$ENV_FILE" .env
+                        '''
+                        
+                        echo "Copying env to server..."
+                        sh """
+                            ssh -p ${env.PORT_SERVER} -i "\$SSH_KEY" -o StrictHostKeyChecking=no ${env.SSH_SERVER} "mkdir -p ${env.PROJECT_PATH}"
+
+                            echo "🧹 Removing old .env on Development..."
+                            ssh -p ${env.PORT_SERVER} -i "\$SSH_KEY" -o StrictHostKeyChecking=no ${env.SSH_SERVER} "rm -f ${env.PROJECT_PATH}/.env"
+
+                            echo "📦 Copying new .env to Development..."
+                            scp -P ${env.PORT_SERVER} -i "\$SSH_KEY" -o StrictHostKeyChecking=no "\$ENV_FILE" ${env.SSH_SERVER}:${env.PROJECT_PATH}/.env
+                        """
+
+                        echo "Copying compose.yaml to server..."
+                        sh """
+                            echo "🧹 Removing old compose.yaml on Development..."
+                            ssh -p ${env.PORT_SERVER} -i "\$SSH_KEY" -o StrictHostKeyChecking=no ${env.SSH_SERVER} "rm -f ${env.PROJECT_PATH}/compose.yaml"
+
+                            echo "📦 Copying new compose.yaml to Development..."
+                            scp -P ${env.PORT_SERVER} -i "\$SSH_KEY" -o StrictHostKeyChecking=no compose.yaml ${env.SSH_SERVER}:${env.PROJECT_PATH}/compose.yaml
+                        """
+                    }
+                }
+            }
+        }
+
+        stage('Build image') {
+            steps {
+                echo "Building Docker Image"
+                sh """
+                    docker compose build 
+                """
+            }
+        }
+
+        stage('Login dockerhub') {
+            steps {
+                withCredentials ([
+                    usernamePassword(credentialsId: "${env.DOCKER_CREDENTIALS}", usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')                                        
+                ]) {
+                    sh """
+                        echo "Login to docker registry account..."
+                        echo "${DOCKER_PASS}" | docker login -u "${DOCKER_USER}" --password-stdin
+                    """
+                }
+            }
+        }
+
+        stage('push image') {
+            steps {
+                echo "Pushing image to docker registry..."
+                sh """
+                    echo "Change tag docker image..."
+                    docker tag ${REGISTRY_USER}/${PROJECT_NAME}:${CURRENT_NODE_ENV}-latest ${REGISTRY_USER}/${PROJECT_NAME}:${CURRENT_NODE_ENV}-${BUILD_NUMBER}
+                    
+                    echo "Pushing image..."
+                    docker push ${REGISTRY_USER}/${PROJECT_NAME}:${CURRENT_NODE_ENV}-latest
+                    docker push ${REGISTRY_USER}/${PROJECT_NAME}:${CURRENT_NODE_ENV}-${BUILD_NUMBER}
+                """
+            }
+        }
+        
+        stage('cleanup jenkins agent') {
+            steps {
+                echo "Cleanup image on jenkins agent..."
+                sh "docker image prune -f"
+            }  
+        }
+
+        stage('Deploy to Server') {
+            steps {
+                withCredentials ([
+                    sshUserPrivateKey(credentialsId: "${env.SSH_CREDENTIALS}", keyFileVariable: 'SSH_KEY')
+                ]) {
+                    sh """
+                        ssh -p ${env.PORT_SERVER} -i "\$SSH_KEY" -o StrictHostKeyChecking=no ${env.SSH_SERVER} "
+                            set -e
+
+                            export CURRENT_NODE_ENV="$CURRENT_NODE_ENV"
+                            export PORT_APP="$PORT_APP"
+                            export PROJECT_NAME="$PROJECT_NAME"     
+                            export REGISTRY_USER="$REGISTRY_USER"
+
+                            echo '⬇️ Change tag latest to old version...'
+                            docker tag ${env.IMAGE_NAME}:${env.CURRENT_NODE_ENV}-latest ${env.IMAGE_NAME}:${env.CURRENT_NODE_ENV}-old-latest || true
+
+                            echo '⬇️ Pulling new image ${env.IMAGE_NAME}:${env.CURRENT_NODE_ENV}-latest...'
+                            docker pull ${env.IMAGE_NAME}:${env.CURRENT_NODE_ENV}-latest
+
+                            echo '🛑 Stopping old container (if exists)...'
+                            docker compose -f ${env.PROJECT_PATH}/compose.yaml down || true
+
+                            echo '🚀 Starting new container...'
+                            docker compose -f ${env.PROJECT_PATH}/compose.yaml up -d || true
+
+                            echo '📦 Cleaning up dangling containers/images...'
+                            docker container prune -f || true
+
+                            echo '🧾 Checking container health...'
+                            sleep 5
+                            if ! docker ps | grep -q ${env.PROJECT_NAME}; then
+                                docker image rm ${env.IMAGE_NAME}:${env.CURRENT_NODE_ENV}-latest
+
+                                docker tag ${env.IMAGE_NAME}:${env.CURRENT_NODE_ENV}-old-latest ${env.IMAGE_NAME}:${env.CURRENT_NODE_ENV}-latest
+                                
+                                echo '❌ ERROR: Container failed to start. Rolling back...'
+                                docker compose -f ${env.PROJECT_PATH}/compose.yaml down 2>/dev/null || true
+                                docker compose -f ${env.PROJECT_PATH}/compose.yaml up -d 2>/dev/null || true
+
+                                exit 1
+                            fi
+
+                            echo '🧹 Cleaning up old images...'
+                            docker image prune -f
+
+                            docker logout
+                            echo '✅ Deployment completed successfully on ${env.CURRENT_NODE_ENV} server!'
+                        "
+                    """
+                }
+            }
+        }
+    }
+    
+    post {
+        failure { echo "❌ Deployment failed." }
+        success { echo "✅ Deployment completed successfully!" }
+    }
+}

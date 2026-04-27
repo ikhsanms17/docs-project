@@ -1,0 +1,136 @@
+pipeline {
+    agent any
+
+    environment {
+        // Git repository details
+        GIT_URL = 'ssh://gitgras@192.168.4.125/volume1/git/dpt/republik/republikorp-be.git'
+        DOCKER_CREDENTIALS = 'credential-dockerhub'
+        SSH_CREDENTIALS = 'ssh-private-key'   // <- ID Jenkins credentials SSH, bukan hostname
+        GIT_CREDENTIALS = 'gitgras-key'
+
+        // Production server details
+        PROD_SERVER = 'republik@192.168.4.28'
+        ENV_PATH = '/var/www/html/republik/envvars/republikorp-be/.env'
+        CONTAINER_NAME = 'republikorp-be'
+        PORT_APP = '3333'
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                echo "📥 Checking out code..."
+                git branch: 'master',
+                    url: "${GIT_URL}",
+                    credentialsId: "${GIT_CREDENTIALS}"
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                echo "🏗️ Building Docker image..."
+                script {
+                    env.IMAGE_NAME = "maolanaikhsan31/republikorp-be"
+                    sh "docker build -t ${IMAGE_NAME}:${BUILD_NUMBER} ."
+                }
+            }
+        }
+
+        stage('Login to Docker Hub') {
+            steps {
+                echo "🔐 Logging in to Docker Hub..."
+                withCredentials([
+                    usernamePassword(credentialsId: "${DOCKER_CREDENTIALS}", usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')
+                ]) {
+                    sh '''
+                        echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+                    '''
+                }
+            }
+        }
+
+        stage('Push Docker Image') {
+            steps {
+                echo "📦 Pushing Docker image ${IMAGE_NAME} to Docker Hub..."
+                sh '''
+                    docker tag ${IMAGE_NAME}:${BUILD_NUMBER} ${IMAGE_NAME}:latest
+                    docker push ${IMAGE_NAME}:${BUILD_NUMBER}
+                    docker push ${IMAGE_NAME}:latest
+                '''
+            }
+        }
+
+        stage('Copy .env to Production Server') {
+            steps {
+                echo "⚙️ Copying .env to production server..."
+                withCredentials([
+                    file(credentialsId: 'republikorp-be-env', variable: 'PROD_ENV_FILE'),
+                    sshUserPrivateKey(credentialsId: "${SSH_CREDENTIALS}", keyFileVariable: 'SSH_KEY')
+                ]) {
+                    sh '''
+                        echo "🧹 Removing old .env on production..."
+                        ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no ${PROD_SERVER} "rm -f ${ENV_PATH}"
+
+                        echo "📦 Copying new .env to production..."
+                        scp -i "$SSH_KEY" -o StrictHostKeyChecking=no "$PROD_ENV_FILE" ${PROD_SERVER}:${ENV_PATH}
+                    '''
+                }
+            }
+        }
+
+        stage('Deploy to Production') {
+            steps {
+                echo "🚀 Deploying container to production..."
+                withCredentials([
+                    sshUserPrivateKey(credentialsId: "${SSH_CREDENTIALS}", keyFileVariable: 'SSH_KEY'),
+                    usernamePassword(credentialsId: "${DOCKER_CREDENTIALS}", usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')
+                ]) {
+                    sh '''
+                        ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no ${PROD_SERVER} "
+                            set -e
+
+                            echo '🔐 Logging in to Docker Hub...'
+                            echo '$DOCKER_PASS' | docker login -u '$DOCKER_USER' --password-stdin
+
+                            echo '⬇️ Pulling new image ${IMAGE_NAME}:latest...'
+                            docker pull ${IMAGE_NAME}:latest
+
+                            echo '🛑 Stopping old container (if exists)...'
+                            docker stop ${CONTAINER_NAME} 2>/dev/null || true
+                            docker rm ${CONTAINER_NAME} 2>/dev/null || true
+
+                            echo '📦 Cleaning up dangling containers/images...'
+                            docker container prune -f || true
+                            docker image prune -f || true
+
+                            echo '🚀 Starting new container...'
+                            docker compose -f /var/www/html/republik/envvars/republikorp-be/docker-compose.yml up -d
+
+                            echo '🧾 Checking container health...'
+                            sleep 5
+                            if ! docker ps | grep -q ${CONTAINER_NAME}; then
+                                echo '❌ ERROR: Container failed to start. Rolling back...'
+                                docker rm -f ${CONTAINER_NAME} 2>/dev/null || true
+                                exit 1
+                            fi
+
+                            echo '🧹 Cleaning up old images...'
+                            docker image prune -f
+
+                            docker logout
+                            echo '✅ Deployment completed successfully on ${PROD_SERVER}!'
+                        "
+                    '''
+                }
+            }
+        }
+    }
+
+    post {
+        failure {
+            echo "❌ Deployment failed."
+        }
+        success {
+            echo "✅ Deployment completed successfully!"
+        }
+    }
+}

@@ -1,0 +1,33 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fe-deployment
+  namespace: frontend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+    spec:
+      containers:
+        - name: republikorp-fe
+          image: maolanaikhsan31/republikorp-fe-test
+          port:
+            - name: port-fe
+              containerPort: 3000
+          envFrom:
+            - configMapRef:
+              name: fe-env-configmap
+            - secretRef:
+              name: fe-env-secret
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "128m"
+            limits:
+              memory: "128Mi"
+              cpu: "128m"

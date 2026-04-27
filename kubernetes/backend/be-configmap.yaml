@@ -1,0 +1,38 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: be-env-configmap
+data:
+  TZ: UTC
+  PORT: 3333
+  HOST: 0.0.0.0
+  LOG_LEVEL: info
+  NODE_ENV: development
+  DB_CONNECTION: pg
+  PG_HOST: 45.158.10.88
+  PG_PORT: 5432
+  PG_USER: postgres
+  PG_DB_NAME: fileshare_repu
+  JWT_EXPIRES_IN: 1d
+  CACHE_MAX_SIZE: 100mb
+  WEBVIEW_TOKEN_EXPIRY: 5m
+  MINIO_ENDPOINT: "minio.santuy.info"
+  MINIO_SSL: true
+  BUCKET_NAME: file-storage
+  MINIO_PRESIGNED_URL_TIME: 86400
+  PUBLIC_URL: https://republikorp.local/api/v1
+  LOCAL_URL: http://republikorp.local/api/v1
+  ENFORCE_GROUP_MEMBERSHIP: true
+  MAX_DUPLICATES_FILES: 20
+  UPLOAD_ALLOWED_MIME: image/jpg,image/jpeg,image/png,image/gif,image/webp,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/zip,application/x-ceb,,audio/mpeg,video/mp4,video/quicktime,video/x-msvideo,video/x-matroska,video/webm,text/plain
+  UPLOAD_EXT_REGEX: jpg|jpeg|png|gif|webp|pdf|doc|docx|xls|xlsx|ppt|pptx|zip|mp3|mp4|mov|avi|mkv|webm|txt|ceb
+  UPLOAD_MAX_SIZE: 2097152000
+  ONLYOFFICE_SERVER_URL: https://office.santuy.info/web-apps/apps/api/documents/api.js
+  ONLYOFFICE_CALLBACK_BASE_URL: https://republikorp-be.santuy.info/api/v1/resources/save
+  EJABBERD_BASE: https://santuy.info:5443/api
+  EJABBERD_HOST: santuy.info
+  SMTP_HOST: smtp.gmail.com
+  SMTP_PORT: 587
+  SMTP_USER: dpttsania@gmail.com
+  SMTP_PASS: qllircweknhwkiso
+  WEBDAV_PORT: 2100
