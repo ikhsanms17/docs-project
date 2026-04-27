@@ -21,9 +21,9 @@ spec:
               containerPort: 3000
           envFrom:
             - configMapRef:
-              name: fe-env-configmap
+                name: fe-env-configmap
             - secretRef:
-              name: fe-env-secret
+                name: fe-env-secret
           resources:
             requests:
               memory: "128Mi"

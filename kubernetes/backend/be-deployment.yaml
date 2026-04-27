@@ -23,9 +23,9 @@ spec:
               containerPort: 2100
           envFrom:
             - configMapRef:
-              name: be-env-configmap
+                name: be-env-configmap
             - secretRef:
-              name: be-env-secret
+                name: be-env-secret
           resources:
             requests:
               memory: "128Mi"
