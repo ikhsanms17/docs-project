@@ -17,4 +17,4 @@ spec:
               service:
                 name: fe-svc
                 port:
-                  number: port-fe
+                  number: 3000
